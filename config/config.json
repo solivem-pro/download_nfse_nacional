@@ -1,0 +1,6 @@
+{
+  "file_prefix": "NFS-e",
+  "download_pdf": true,
+  "delay_seconds": 5.0,
+  "timeout": 30.0
+}

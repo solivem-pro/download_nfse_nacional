@@ -1,0 +1,11 @@
+{
+  "cadastros": 2,
+  "cadastro_0": {
+    "cod": 0,
+    "empresa": "EMPRESA MODELO",
+    "cert_path": "caminho/do/certificado.pfx",
+    "cert_pass": "senha_do_certificado",
+    "cnpj": "cnpj",
+    "venc": ""
+  }
+}
