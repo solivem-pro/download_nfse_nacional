@@ -1,253 +1,62 @@
----
-created: 2025-10-10T17:59
-updated: 2025-10-21T15:38
----
-# Baixar NFS-e Portal Nacional
-
-  
-
-Ferramenta em **Python** para automatizar o download de Notas Fiscais de Serviço (NFS-e) diretamente do Portal Nacional, salvando XML e PDF com praticidade.
-
-  
-
-[![build status](https://github.com/USERNAME/baixar_nfse_portal_nacional/actions/workflows/build_exe.yml/badge.svg)](https://github.com/USERNAME/baixar_nfse_portal_nacional/actions/workflows/build_exe.yml)
-
-[![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-
-  
-
-## Baixe o executável
-
-  
-
-Sempre que mudanças são enviadas para o branch `main` o projeto gera
-
-automaticamente um arquivo `exe` através do GitHub Actions. Você pode
-
-obter a versão mais recente acessando a página de releases e baixando o
-
-executável disponível.
-
-  
-
-[Download do instalador](https://github.com/USERNAME/baixar_nfse_portal_nacional/releases/latest)
-
-  
-
-## Visão geral
-
-  
-
-O projeto simplifica a obtenção de notas fiscais eletrônicas emitidas pelo Portal Nacional da NFS-e. Ideal para empresas e contadores que precisam manter o arquivo de notas organizado sem acessar manualmente o site.
-
-  
-
-### Principais recursos
-
-  
-
-- Baixa automaticamente XML e PDFs das notas.
-
-- Armazena logs e permite retomar o processo pelo último NSU.
-
-- Utiliza certificado digital (PFX ou PEM) para autenticação.
-
-- Possui interface gráfica simples construída com `tkinter`.
-
-- Suporte a criação de executável standalone via PyInstaller.
-
-  
-
-### Fluxo de funcionamento
-
-  
-
-```mermaid
-
-flowchart LR
-
-    A[config.json] -->|Certificado| B[Portal Nacional]
-
-    B --> C[XML/PDF]
-
-    C --> D[Diretório de saída]
-
-```
-
-  
-
-## Instalação
-
-  
-
-1. Tenha o **Python 3.10** ou superior instalado.
-
-2. (Opcional) Crie um ambiente virtual:
-
-  
-
-```bash
-
-python3 -m venv .venv
-
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
-
-```
-
-  
-
-3. Instale as dependências executando o 1.instalador.py (se criou o .exe execute dentro da dist criada, pois cria e realoca alguns arquivos necessários)
-
-  
-
-## Configuração
-
-  
-
-Edite o arquivo `config.json` ou no menu `Configurações`, possui as chaves:
-
-  
-
-- `file_prefix`: prefixo dos arquivos.
-
-- `download_pdf`: `true` para baixar também o PDF.
-
-- `delay_seconds`: intervalo entre consultas.
-
-- `timeout`: tempo limite das requisições.
-
-  
-
-## Cadastros
-
-No menu `Cadastros` clique em `Adicionar`. Todos os registros são gravados internamente em `cadastros.json`, uma nova pasta para a empresa é criada com os arquivos e diretórios bases em `/packs` com o nome sendo o `Código` da empresa. Sendo os seguintes campos:
-
-  
-
-- `Código`: identificador numérico, registro único
-
-- `Empresa`: nome de identificação da empresa
-
-- `CNPJ`: CNPJ da empresa, registro único
-
-- `Senha do Certificado`: senha do certificado
-
-- `Certificado (.pfx)` : importa uma cópia do certificado escolhido
-
-- `Vencimento Cert:` se a senha estiver correta, valida a data de vencimento do certificado para controle
-
-  
-
-#### NSU
-
-O NSU é o Número Sequencial Único, cada empresa, seja prestadora ou emissora, possui contagem própria que inicia em 1 e segue aumentando em 1 a cada nota (emitida ou tomada, mesma contagem).
-
-Cada empresa possui controle de NSU individualmente na tela de cadastro. Usário consegue alterar os valores sobreescrevendo ou excluindo os registros. O controle por competência é feita com base desses regsitros salvos em `nsu_competencia.json` dentro da pasta da empresa
-
-  
-
-## Uso
-
-Execute o script principal e vá para o menu `Baixar NFSe`:
-
-  
-
-```bash
-
-python download_nfse.py
-
-```
-
-  
-
-O programa inicia a interface gráfica e começa a baixar as notas de acordo com a competência escolhiada. Os arquivos são gravados seguindo o padrão `<prefixo>_AAAA-MM_<chave>.xml`. Os `.xml` são separados por tipo (Prestador, Tomador ou Evento) e importados para o `relatorio_[cod].xlsm` para gerar relatório e ao final é gerado um arquivo `.zip` para exportação.
-
-  
-
-## Contribuição
-
-  
-
-Contribuições são bem-vindas! Abra issues ou pull requests com melhorias, correções ou novas funcionalidades. Para mudanças maiores, discuta previamente através de uma issue.
-
-  
-
-## Licença
-
-  
-
-Distribuído sob a licença [MIT](LICENSE).
-
-  
-
-## Contato
-
-  
-
-Para dúvidas ou suporte abra uma issue no GitHub ou contate **Renan R. Santos** através do [LinkedIn](https://www.linkedin.com/).
-
-  
-
-## Documentação online
-
-  
-
-Você pode publicar a pasta `docs/` via **GitHub Pages** para hospedar uma documentação completa em <https://USERNAME.github.io/baixar_nfse_portal_nacional/>.
-
-  
-
-## Dados estruturados
-
-  
-
-```html
-
-<script type="application/ld+json">
-
-{
-
-  "@context": "https://schema.org",
-
-  "@type": "SoftwareApplication",
-
-  "name": "Baixar NFS-e Portal Nacional",
-
-  "applicationCategory": "BusinessApplication",
-
-  "operatingSystem": "Windows, Linux, macOS",
-
-  "license": "https://opensource.org/licenses/MIT",
-
-  "offers": {
-
-    "@type": "Offer",
-
-    "price": "0",
-
-    "priceCurrency": "BRL"
-
-  }
-
-}
-
-</script>
-
-```
-
-  
+# Documentação do Baixar NFS-e Portal Nacional
+
+## Visão Geral
+- Esse é um programa que capta os arquivo [.xml] e [.pdf] NFSe do Portal Nacional a partir do NSU de cada empresa cadastrada.
+- O NSU é o Número Sequencial Único, cada empresa, seja prestadora ou emissora, possui contagem própria que inicia em 1 e segue aumentando em 1 a cada nota (emitida ou tomada, mesma contagem).
+- Por meio da API fornecida pelo próprio governo, o processo foi automatizado e é controlado individualmente por empresa.
+- Cada empresa deve ser cadastrada manualmente e posteriormente executada definindo a competência escolhida para os arquivo serem baixados. Ao final dos processos, os arquivos podem ser exportados. Só é exportável o último período processado.
+- No menu 'Configurações' há algumas opções de configuração básica, como se serão baixados o arquivo [.pdf] ou não.
+- Como se trata de um projeto em fase de teste não exime de verificação humana referente a quantidade de arquivos e dados. Qualquer fator de correção favor entrar em contato
+
+-----------------
+
+## Menus
+### 1. Baixar NFSe
+1. Tabela das empresas cadastradas, ordenada por ordem crescente de código
+2. Ano e mês: escolher a competência que serão baixados os arquivos
+3. Selec. Todos: seleciona todas as empresas, para selecionar ou desmarcar individualmente basta clicar na desejada que a marcação é alternada
+4. Baixar: baixa as selecionadas. Apenas ativada quando há pelo menos uma selecionada.
+5. Exportar: exporta o arquivo compacto das selecionadas. Apenas ativado quando há pelo menos uma selecionada.
+6. Voltar: Volta para o menu principal
+- Ao baixar um popup de processamento é iniciado com contador do progresso.
+- Ao exportar é gerado um arquivo [.zip], com:
+	- As pastas com [.xml] e [.pdf]:
+		- PRESTADOS
+		- TOMADOS
+		- EVENTOS (geralmente notas canceladas, podem ser emissões ou tomados)
+	- nsu_competencia.json: mostra os registros dos NSU por competência, usar apenas caso necessário e conferência
+	- erros.txt: registra os erros durante operação de download
+	- relatório_{cod}.xlsm: relatório em planilha divida em 3 abas:
+		- TOMADOS
+		- PRESTADOS
+		- EVENTOS
 
 ---
 
-  
+### 2. Cadastro
+1. Adicionar: Clique em adicionar para criar uma nova empresa para controle. Devem ser completados todos os campos para registrar:
+	1. Código: numérico e único pra empresa, só pode ser alterado na criação da empresa
+	2. Empresa: nome de identificação da empresa
+	3. CNPJ: CNPJ da empresa, possui formatação automática no campo, portanto aceita entrada formatada. Único por empresa.
+	4. Importar Certificado (.pfx): é necessário escolher um certificado válido para realizar o download dos arquivos, ele é importado como cópia para pasta interna.
+	5. Senha Certificado: senha de acesso do certificado importado
+2. Editar: se precisar editar alguma informação ou atualizar o cadastro da empresa. Selecione uma empresa para habilitar a edição.
+3. Editar NSU: todos os registros de NSU da empresa estarão neste submenu:
+	1. Tabela ordenada por competência da mais atual para a mais antiga.
+	2. Adicionar: para adicionar é necessário preencher todos os campos
+	3. Excluir: deleta o registro selecionado. Só habilitado ao selecionar uma competência.
+	4. Excluir Todos: deleta dos registros todas as competência da empresa atual.
+	5. Voltar: volta para a janela anterior
+	- Campos de edição, servem para adicionar uma competência nova ou sobrescrever uma já existente
+4. Excluir: deleta o cadastro da empresa selecionada. Só habilitado ao selecionar uma competência.
+5. Excluir Todos: deleta todas as empresas cadastradas.
+6. Voltar: Voltar para a janela principal
 
-### Tópicos sugeridos
+-----------
 
-`nfse`, `nfs-e`, `portal-nacional`, `download`, `python`, `automacao`, `xml`, `pdf`.
+### 3. Configurações
 
-  
-  
-  
-
-### APIs NACIONAIS
-
-https://www.gov.br/nfse/pt-br/biblioteca/documentacao-tecnica/tabelas-de-dominio
+1. Prefixo Arquivo: como os arquivos [.xml] e [.pdf] serão iniciados
+2. Delay(s): tempo entre lotes, afeta bloqueios de certificado
+3. Timeout(s): quantos segundos o programa esperará ao máximo para obter resposta do servidor da API
+4. Baixar PDF: se marcado baixa os arquivos [.pdf] da DANFSe
