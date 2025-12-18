@@ -29,20 +29,21 @@ class CadastroUI:
 
     def _setup_ui(self):
         """Configura a interface principal"""
-        self.win = modal_window(self.parent.root, "Cadastros - Download NFSe Nacional", 700, 500)
+        self.win = modal_window(self.parent.root, "Cadastros - Download NFSe Nacional", 800, 500)
         self.data = carregar_json(DIRETORIOS['cadastros_json'])
         
         self._criar_treeview()
         self._criar_botoes()
         self._atualizar_lista()
 
+
     def _criar_treeview(self):
         """Cria a treeview usando função do ui_basic"""
         columns_config = [
-            ('cod', 'Código', 80, 'center'),
-            ('empresa', 'Empresa', 200, 'center'),
-            ('cnpj', 'CNPJ', 150, 'center'),
-            ('venc', 'Venc. Cert.', 100, 'center')
+            ('cod', 'Código', 80, 'center', 'int'),  
+            ('empresa', 'Empresa', 200, 'center', 'string'), 
+            ('cnpj', 'CNPJ', 150, 'center', 'string'),  
+            ('venc', 'Venc. Cert.', 100, 'center', 'date_dd_mm_yyyy')  
         ]
         self.tree, scrollbar, _ = scrolled_treeview(self.win, columns_config)
         
@@ -59,6 +60,7 @@ class CadastroUI:
             {'text': "Editar", 'width': 10, 'state': tk.DISABLED, 'command': self._editar},
             {'text': "Editar NSU", 'width': 10, 'state': tk.DISABLED, 'command': self._editar_nsu},
             {'text': "Excluir", 'width': 10, 'state': tk.DISABLED, 'command': self._excluir},
+            {'text': "Resetar NSUs", 'width': 12, 'command': self._resetar_nsu},
             {'text': "Excluir Todos", 'width': 15, 'command': self._excluir_todos}
         ]
         
@@ -169,7 +171,40 @@ class CadastroUI:
         key = self.chaves_cadastros[index]
         cadastro = self.data[key]
         
-        EditorNSU(self.win, cadastro)
+        EditorNSU(self, cadastro)
+
+    def _resetar_nsu(self):
+        """Reseta os NSUs de todas as empresas cadastradas"""
+        if not messagebox.askyesno("Confirmação", "Deseja realmente resetar os NSUs de TODOS os cadastros?"):
+            return
+
+        logger.info(f"Limpando arquivos a partir de: {DIRETORIOS['packs']}")
+            
+        # Conteúdo a ser escrito nos arquivos
+        conteudo_json = '''{
+    "registros": {
+        "2000": {
+        "01": {"nsu_inicial": 0, "nsu_final": 0}
+            }
+        }
+    }'''
+            
+        # Percorre recursivamente todas as pastas e subpastas
+        for pasta_raiz, subpastas, arquivos in os.walk(DIRETORIOS['packs']):
+            for arquivo in arquivos:
+                if arquivo == "nsu_competencia.json":
+                    caminho_arquivo = os.path.join(pasta_raiz, arquivo)
+                    try:
+                        # Abre o arquivo no modo de escrita e escreve o conteúdo JSON
+                        with open(caminho_arquivo, 'w', encoding='utf-8') as f:
+                            f.write(conteudo_json)
+                        logger.info(f"Conteúdo atualizado: {caminho_arquivo}")
+                    except Exception as e:
+                        logger.error(f"Erro ao atualizar {caminho_arquivo}: {str(e)}")
+
+        salvar_json(self.data, DIRETORIOS['cadastros_json'])
+        self._atualizar_lista()
+        messagebox.showinfo("Sucesso", "NSUs de todos os cadastros foram resetados com sucesso!")
 
     def _excluir(self):
         """Exclui cadastro selecionado"""
@@ -208,9 +243,10 @@ class CadastroUI:
 
         # Deletar certificado
         cert_file = os.path.basename(empresa_data['cert_path'])
-        cert_path = os.path.join(DIRETORIOS['certificados'], cert_file)
-        if os.path.exists(cert_path):
-            os.remove(cert_path)
+        if cert_file:
+            cert_path = os.path.join(DIRETORIOS['certificados'], cert_file)
+            if os.path.exists(cert_path):
+                os.remove(cert_path)
 
         # Deletar pasta de notas
         notas_path = os.path.join(DIRETORIOS['notas'], str(cod_empresa))
@@ -232,6 +268,7 @@ class CadastroUI:
 class EditorCadastro:
     """Editor para adicionar/editar cadastros de empresas"""
     logger = logging.getLogger(__name__)
+    
     def __init__(self, parent, edit_key=None):
         self.parent = parent
         self.edit_key = edit_key
@@ -242,11 +279,9 @@ class EditorCadastro:
 
     def _setup_ui(self):
         """Configura a interface do editor"""
-        self.sub = tk.Toplevel(self.parent.win)
-        self.sub.title("Cadastro de Empresa - Download NFSe Nacional")
-        centralizar(self.sub, 500, 250)
-        self.sub.transient(self.parent.win)
-        self.sub.grab_set()
+        titulo = "Editar Cadastro" if self.edit_key else "Novo Cadastro"
+        self.sub = modal_window(self.parent.win, f"{titulo} - Download NFSe Nacional", 460, 250)
+        
         self._criar_campos()
         self._criar_botoes()
         
@@ -267,7 +302,7 @@ class EditorCadastro:
         tooltips = {
             "cod": "Código numérico único da empresa. Não pode ser alterado após criado.",
             "empresa": "Nome fantasia ou razão social da empresa.",
-            "cnpj": "Número do CNPJ da empresa (formatação automática).",
+            "cnpj": "CNPJ da empresa (formatação automática).",
             "cert_pass": "Senha do certificado digital correspondente ao arquivo .PFX.",
             "cert_path": "Selecione o arquivo .PFX do certificado digital da empresa que será importado.",
             "venc": "Data de vencimento do certificado (será lida automaticamente ao importar o certificado)."
@@ -286,10 +321,10 @@ class EditorCadastro:
                 
             entry.grid(row=i, column=1, padx=8, pady=5)
 
-            self._configurar_campo(key, entry)
+            self._configurar_campo(key, entry, i)
             self._adicionar_tooltip(i, key, tooltips.get(key, ""))
 
-    def _configurar_campo(self, key: str, entry: tk.Entry):
+    def _configurar_campo(self, key: str, entry: tk.Entry, row: int):
         """Configura comportamentos específicos para cada campo"""
         if key == "cod":
             entry.bind("<FocusOut>", self._validar_codigo)
@@ -301,21 +336,21 @@ class EditorCadastro:
             entry.bind("<FocusOut>", self._validar_cnpj)
             
         elif key == "cert_path":
-            self._adicionar_botao_arquivo(entry, i=4)
+            self._adicionar_botao_arquivo(entry, row)
 
         entry.bind("<Return>", lambda e: e.widget.tk_focusNext().focus())
 
-    def _adicionar_botao_arquivo(self, entry, i: int):
+    def _adicionar_botao_arquivo(self, entry, row: int):
         """Adiciona botão para selecionar arquivo"""
         btn_browse = tk.Button(self.sub, text="...", command=self._browse_file)
-        btn_browse.grid(row=i, column=2, padx=3)
+        btn_browse.grid(row=row, column=2, padx=3)
 
     def _adicionar_tooltip(self, row: int, key: str, text: str):
         """Adiciona tooltip ao campo"""
         if not text:
             return
             
-        icon = tk.Label(self.sub, text="❓", fg="blue", cursor="question_arrow")
+        icon = tk.Label(self.sub, text="ℹ", fg="blue", cursor="question_arrow")
         icon.grid(row=row, column=3, sticky="w", padx=2)
         ToolTip(icon, text)
 
@@ -332,7 +367,8 @@ class EditorCadastro:
         btn_salvar = tk.Button(frame_actions, text="Salvar", width=12, command=self._salvar)
         btn_salvar.grid(row=0, column=1, padx=5)
         
-        btn_cancelar = tk.Button(frame_actions, text="Cancelar", width=12, command=self.sub.destroy)
+        btn_cancelar = tk.Button(frame_actions, text="Cancelar", width=12, 
+                                 command=lambda: back_window(self.sub, self.parent.win))
         btn_cancelar.grid(row=0, column=2, padx=5)
 
     def _preencher_dados(self):
@@ -462,7 +498,7 @@ class EditorCadastro:
         """Valida unicidade do CNPJ"""
         cnpj_digitado = validar_cnpj(self.fields["cnpj"].get())
         if not cnpj_digitado:
-            messagebox.showerror("Erro", "CNPJ inválido (deve conter 14 dígitos numéricos).")
+            messagebox.showerror("Erro", "CNPJ inválido, deve conter 14 dígitos alfanuméricos.")
             event.widget.focus_set()
             return
 
@@ -487,7 +523,7 @@ class EditorCadastro:
 
         salvar_json(self.parent.data, DIRETORIOS['cadastros_json'])
         self.parent._atualizar_lista()
-        self.sub.destroy()
+        back_window(self.sub, self.parent.win)
 
     def _validar_dados(self) -> bool:
         """Valida os dados do formulário"""
@@ -507,7 +543,7 @@ class EditorCadastro:
             messagebox.showerror("Erro", "Código deve ser um número inteiro.")
             return False
         if not cnpj:
-            messagebox.showerror("Erro", "CNPJ inválido (deve conter 14 dígitos numéricos).")
+            messagebox.showerror("Erro", "CNPJ inválido, deve conter 14 dígitos alfanuméricos.")
             return False
 
         return True
@@ -597,17 +633,15 @@ class EditorNSU:
         self.entry_mes = None
         self.entry_inicial = None
         self.entry_final = None
-        self.entry_ultimo = None
         self.btn_delete_nsu = None
         self._setup_ui()
 
     def _setup_ui(self):
         """Configura a interface do editor de NSU"""
-        self.win_nsu = tk.Toplevel(self.parent)
-        self.win_nsu.title(f"Editar NSU - {self.cadastro['empresa']} - Download NFSe Nacional")
-        centralizar(self.win_nsu, 600, 500)
-        self.win_nsu.transient(self.parent)
-        self.win_nsu.grab_set()
+        self.win_nsu = modal_window(self.parent.win, 
+                                     f"Editar NSU - {self.cadastro['empresa']} - Download NFSe Nacional", 
+                                     500, 500)
+        
         self._carregar_dados()
         self._criar_interface()
 
@@ -643,12 +677,10 @@ class EditorNSU:
     def _criar_treeview(self, parent):
         """Cria a treeview usando função do ui_basic"""
         columns_config = [
-            ('ano', 'Ano', 80, 'center'),
-            ('mes', 'Mês', 80, 'center'),
-            ('nsu_inicial', 'NSU Inicial', 100, 'center'),
-            ('nsu_final', 'NSU Final', 100, 'center'),
-            ('ultimo_verificado', 'Último Verificado', 120, 'center')
-        ]
+            ('ano', 'Ano', 80, 'center', 'int'),  
+            ('mes', 'Mês', 80, 'center', 'int'),  
+            ('nsu_inicial', 'NSU Inicial', 100, 'center', 'int'),  
+            ('nsu_final', 'NSU Final', 100, 'center', 'int'),          ]
         self.tree_nsu, scrollbar, _ = scrolled_treeview(parent, columns_config)
         self.tree_nsu.bind('<<TreeviewSelect>>', self._on_tree_select)
 
@@ -673,17 +705,14 @@ class EditorNSU:
         tk.Label(frame_controls, text="NSU Final:").grid(row=0, column=6, padx=2, pady=2, sticky='w')
         self.entry_final = tk.Entry(frame_controls, width=8)
         self.entry_final.grid(row=0, column=7, padx=2, pady=2)
-        
-        tk.Label(frame_controls, text="Último Verif:").grid(row=0, column=8, padx=2, pady=2, sticky='w')
-        self.entry_ultimo = tk.Entry(frame_controls, width=8)
-        self.entry_ultimo.grid(row=0, column=9, padx=2, pady=2)
+    
         
         # Configurar formatação numérica
-        for entry in [self.entry_inicial, self.entry_final, self.entry_ultimo]:
+        for entry in [self.entry_inicial, self.entry_final]:
             entry.bind("<KeyRelease>", formatar_milhar)
         
         # Bind dos campos para avançar com Enter
-        campos = [self.entry_ano, self.entry_mes, self.entry_inicial, self.entry_final, self.entry_ultimo]
+        campos = [self.entry_ano, self.entry_mes, self.entry_inicial, self.entry_final]
         for i, campo in enumerate(campos):
             proximo = campos[i+1] if i < len(campos)-1 else None
             if proximo:
@@ -704,7 +733,8 @@ class EditorNSU:
         self.btn_delete_nsu = botoes["Excluir"]
         
         # Botão voltar à direita
-        btn_close = tk.Button(frame_buttons, text="Voltar", width=10, command=self.win_nsu.destroy)
+        btn_close = tk.Button(frame_buttons, text="Voltar", width=10, 
+                            command=lambda: back_window(self.win_nsu, self.parent.win))
         btn_close.pack(side=tk.RIGHT, padx=20)
 
     def _atualizar_treeview(self):
@@ -723,7 +753,6 @@ class EditorNSU:
                     str(mes).zfill(2),  # Força dois dígitos no mês
                     f"{dados.get('nsu_inicial', 0):,}".replace(",", "."),  # Formata com ponto de milhar
                     f"{dados.get('nsu_final', 0):,}".replace(",", "."),    # Formata com ponto de milhar
-                    f"{dados.get('ultimo_verificado', 0):,}".replace(",", ".")  # Formata com ponto de milhar
                 ))
 
     def _limpar_campos(self):
@@ -732,17 +761,17 @@ class EditorNSU:
         self.entry_mes.delete(0, tk.END)
         self.entry_inicial.delete(0, tk.END)
         self.entry_final.delete(0, tk.END)
-        self.entry_ultimo.delete(0, tk.END)
 
     def _salvar_alteracoes(self):
-        """Salva as alterações no arquivo JSON"""
+        """Salva as alterações no arquivo JSON com formatação compacta"""
         cod_empresa = self.cadastro['cod']
         pasta_empresa = os.path.join(DIRETORIOS['notas'], str(cod_empresa))
         arquivo_nsu = os.path.join(pasta_empresa, 'nsu_competencia.json')
         
         try:
             with open(arquivo_nsu, 'w', encoding='utf-8') as f:
-                json.dump(self.dados_nsu, f, indent=2)
+                # Formatação compacta - sem indentação
+                json.dump(self.dados_nsu, f, ensure_ascii=False, separators=(',', ':'))
             messagebox.showinfo("Sucesso", "Alterações salvas com sucesso!")
         except Exception as e:
             messagebox.showerror("Erro", f"Erro ao salvar arquivo:\n{e}")
@@ -753,7 +782,6 @@ class EditorNSU:
         mes = self.entry_mes.get().strip()
         nsu_inicial = limpar_numero(self.entry_inicial.get().strip())
         nsu_final = limpar_numero(self.entry_final.get().strip())
-        ultimo_verificado = limpar_numero(self.entry_ultimo.get().strip())
         
         # Validações
         if not ano or not mes:
@@ -769,18 +797,18 @@ class EditorNSU:
             messagebox.showerror("Erro", "Ano e mês devem ser números válidos!")
             return
         
-        # Garantir estrutura
+        # Garantir estrutura - modificado para estrutura compacta
         if 'registros' not in self.dados_nsu:
             self.dados_nsu['registros'] = {}
         if ano not in self.dados_nsu['registros']:
             self.dados_nsu['registros'][ano] = {}
         
-        # Adicionar/atualizar registro
+        # Adicionar/atualizar registro - versão compacta
         self.dados_nsu['registros'][ano][mes] = {
-            'nsu_inicial': int(nsu_inicial) if nsu_inicial else 0,
-            'nsu_final': int(nsu_final) if nsu_final else 0,
-            'ultimo_verificado': int(ultimo_verificado) if ultimo_verificado else 0
+            "nsu_inicial": int(nsu_inicial) if nsu_inicial else 0,
+            "nsu_final": int(nsu_final) if nsu_final else 0
         }
+        
         self._salvar_alteracoes()
         self._limpar_campos()
         self._atualizar_treeview()
@@ -828,7 +856,7 @@ class EditorNSU:
         """Função para avançar para o próximo campo ou salvar se for o último"""
         if event.keysym == 'Return':
             # Verifica se todos os campos estão preenchidos
-            campos = [self.entry_ano, self.entry_mes, self.entry_inicial, self.entry_final, self.entry_ultimo]
+            campos = [self.entry_ano, self.entry_mes, self.entry_inicial, self.entry_final]
             todos_preenchidos = all(campo.get().strip() for campo in campos)
             
             if todos_preenchidos:

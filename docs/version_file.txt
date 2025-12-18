@@ -18,7 +18,7 @@ VSVersionInfo(
           StringStruct('CompanyName', 'Renan R. Santos; Solivan A. dos Santos'),
           StringStruct('FileDescription', 'Download NFS-e Portal Nacional'),
           StringStruct('FileVersion', '1.0.0'),
-          StringStruct('ProductVersion', '0.5.5'),
+          StringStruct('ProductVersion', '1.0'),
           StringStruct('InternalName', 'download_nfse'),
           StringStruct('OriginalFilename', 'download_nfse.exe'),
           StringStruct('ProductName', 'Download NFS-e Portal Nacional')

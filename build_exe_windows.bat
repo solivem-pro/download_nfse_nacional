@@ -1,5 +1,6 @@
 @echo off
-echo Construindo execut├ível com PyInstaller...
+echo Construindo executável com PyInstaller...
+
 python -m PyInstaller --onedir -w --noupx ^
   --hidden-import=requests ^
   --hidden-import=cryptography ^
@@ -8,10 +9,10 @@ python -m PyInstaller --onedir -w --noupx ^
   --hidden-import=tkhtmlview ^
   --hidden-import=markdown ^
   --hidden-import=plyer ^
-  --add-data "config;config" ^
-  --add-data "docs;docs" ^
-  --add-data "cert_path;cert_path" ^
-  --add-data "packs/0;packs/0" ^
+  --collect-all config ^
+  --collect-all docs ^
+  --collect-all cert_path ^
+  --collect-all packs ^
   --icon=config/icone.ico ^
   --version-file=docs/version_file.txt ^
   download_nfse.py

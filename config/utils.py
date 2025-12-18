@@ -27,7 +27,7 @@ def limpar_cnpj(cnpj: str) -> str:
     """Remove formatação de um CNPJ, mantendo zeros à esquerda."""
     if not cnpj:
         return ""
-    return "".join(filter(str.isdigit, str(cnpj)))
+    return "".join(filter(str.isalnum, str(cnpj)))
 
 def validar_cnpj(cnpj: str) -> Optional[str]:
     """Valida e retorna CNPJ limpo se for válido."""
@@ -50,7 +50,7 @@ def formatar_cnpj_digitacao(event: tk.Event) -> None:
     cursor_pos_original = widget.index(tk.INSERT)
 
     # Remove tudo que não é dígito e limita a 14 caracteres
-    cnpj_limpo = "".join(filter(str.isdigit, texto_original))[:14]
+    cnpj_limpo = "".join(filter(str.isalnum, texto_original))[:14]
     
     # Aplica formatação progressiva
     formatos = [
@@ -79,14 +79,14 @@ def formatar_cnpj_digitacao(event: tk.Event) -> None:
     widget.insert(0, cnpj_formatado)
     
     # Reposiciona o cursor
-    digitos_ate_cursor = sum(1 for ch in texto_original[:cursor_pos_original] if ch.isdigit())
+    digitos_ate_cursor = sum(1 for ch in texto_original[:cursor_pos_original] if ch.isalnum())
     novo_cursor = 0
     digitos_encontrados = 0
     
     for char in cnpj_formatado:
         if digitos_encontrados >= digitos_ate_cursor:
             break
-        if char.isdigit():
+        if char.isalnum():
             digitos_encontrados += 1
         novo_cursor += 1
     

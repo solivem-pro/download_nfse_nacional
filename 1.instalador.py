@@ -24,7 +24,8 @@ _DIR_PATHS = {
     'docs': ROOT_DIR / 'docs',
     'EVENTOS':  ROOT_DIR / 'packs' / '0' / 'EVENTOS',
     'TOMADOS':  ROOT_DIR / 'packs' / '0' / 'TOMADOS',
-    'PRESTADOS':  ROOT_DIR / 'packs' / '0' / 'PRESTADOS'
+    'PRESTADOS':  ROOT_DIR / 'packs' / '0' / 'PRESTADOS',
+    'temp': ROOT_DIR / 'temp'
 }
 
 _DIR_FILES = {
@@ -38,6 +39,8 @@ _CONFIG_FILES = {
     'icone': ROOT_DIR / '_internal' / 'config' / 'icone.ico',
     'config_json': ROOT_DIR / '_internal' / 'config' / 'config.json' 
 }
+
+ATT_SHEET_PY = ROOT_DIR / 'config' / 'att_planilhas.py'
 
 # Criar diretórios necessários ao importar o módulo
 def _inicializar_diretorios() -> None:
@@ -153,6 +156,15 @@ def verificar_instalar_dependencias():
     
     return len(falhas) == 0, falhas
 
+def atualizar_planilhas():
+    """Executa o script de atualização de planilhas"""
+    print("\nAtualizando planilhas Excel...")
+    try:
+        subprocess.check_call([sys.executable, str(ATT_SHEET_PY)])
+        print("✓ Planilhas atualizadas com sucesso")
+    except subprocess.CalledProcessError as e:
+        print(f"✗ Falha ao atualizar planilhas: {str(e)}")
+
 def formatar_lista_falhas(falhas):
     """Formata a lista de falhas com bullets e quebras de linha"""
     if not falhas:
@@ -188,6 +200,7 @@ def main():
     if sucesso:
         mensagem = "Todas as dependências foram instaladas com sucesso!\n\nAgora você pode executar o programa principal."
         print(f"\n{mensagem}")
+        atualizar_planilhas()
         mostrar_popup(mensagem, "Instalação Completa")
     else:
         lista_falhas = formatar_lista_falhas(falhas)

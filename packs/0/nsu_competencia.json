@@ -1,4 +1,7 @@
 {
-  "registros": {
-  }
-}
+    "registros": {
+        "2000": {
+        "01": {"nsu_inicial": 0, "nsu_final": 0}
+            }
+        }
+    }

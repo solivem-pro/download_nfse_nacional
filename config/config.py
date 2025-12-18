@@ -30,9 +30,11 @@ _DIR_PATHS = {
     'logs': ROOT_DIR / 'logs',
     'config': ROOT_DIR / 'config',
     'docs': ROOT_DIR / 'docs',
+    'packs': ROOT_DIR / 'packs',
     'EVENTOS':  ROOT_DIR / 'packs' / 'EVENTOS',
     'TOMADOS':  ROOT_DIR / 'packs' / 'TOMADOS',
-    'PRESTADOS':  ROOT_DIR / 'packs' / 'PRESTADOS'
+    'PRESTADOS':  ROOT_DIR / 'packs' / 'PRESTADOS',
+    'temp': ROOT_DIR / 'temp'
 }
 
 _DIR_FILES = {
@@ -40,8 +42,9 @@ _DIR_FILES = {
     'config_json': _DIR_PATHS['config'] / 'config.json',
     'cadastros_json': _DIR_PATHS['config'] / 'cadastros.json',
     'icone': _DIR_PATHS['config'] / 'icone.ico',
-    'instrucoes': _DIR_PATHS['docs'] / 'index.md',
+    'instrucoes': ROOT_DIR / 'README.md',
     'versao': _DIR_PATHS['docs'] / 'versao.txt',
+    'vba' : _DIR_PATHS['docs'] / 'vba.bas',
 }
 
 # Combinar todos os diretórios em um único dicionário
@@ -52,10 +55,12 @@ DIRETORIOS = {**_DIR_PATHS, **_DIR_FILES}
 ## ------------------------------------------------------------------------------
 @dataclass
 class Config:
-    file_prefix: str = "NFS-e"
+    file_prefix: str = "NSU"
     download_pdf: bool = False
     delay_seconds: float = 0.5
     timeout: int = 60
+    consult_mode : str = "Competência"
+    save_mode : str = "Código"
 
     @classmethod
     def load(cls, path: str | Path) -> Config:
@@ -71,6 +76,7 @@ class Config:
             default_config = cls()
             default_config.save(path)
             return default_config
+
 
         # Combina configurações do arquivo com valores padrão
         cfg_data = asdict(cls())

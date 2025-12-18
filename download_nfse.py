@@ -14,6 +14,7 @@ from config.config import configurar_logging
 from ui.ui_basic import modal_window, back_window, centralizar
 
 configurar_logging(nivel=logging.INFO)
+logger = logging.getLogger(__name__)
 
 try:
     from docs.version import __version__
@@ -83,11 +84,29 @@ class App:
             return window.winfo_exists()
         except Exception:
             return False
+        
+    def bring_all_to_front(self):
+        """Trazer todas as janelas modais para frente junto com a principal"""
+        self.root.lift()
+        self.root.focus_force()
+        
+        # Traz todas as janelas modais para frente
+        if hasattr(self.root, '_modal_windows'):
+            for modal in self.root._modal_windows:
+                if modal.winfo_exists():
+                    try:
+                        modal.lift()
+                    except:
+                        pass
 
     def show_instructions(self) -> None:
         """Exibe as instruções do arquivo instrucoes.md"""
+        # Traz todas as janelas para frente primeiro
+        self.bring_all_to_front()
+        
         if self._window_exists(getattr(self, 'instructions_win', None)):
             self.instructions_win.lift()
+            self.instructions_win.focus_set()
             return
 
         self.instructions_win = modal_window(self.root, "Documentação - Download NFSe Nacional", 800, 600)
@@ -143,8 +162,12 @@ class App:
 
     def show_about(self) -> None:
         """Exibe informações sobre a aplicação"""
+        # Traz todas as janelas para frente primeiro
+        self.bring_all_to_front()
+        
         if self._window_exists(getattr(self, 'about_win', None)):
             self.about_win.lift()
+            self.about_win.focus_set()
             return
 
         self.about_win = modal_window(self.root, "Sobre - Download NFSe Nacional", 600, 500)
@@ -180,6 +203,7 @@ class App:
 if __name__ == "__main__":
     try:
         cfg = Config.load(DIRETORIOS['config_json'])
+        logger.info(f"Configuração carregada: \n{cfg}")
     except Exception as e:
         tk.Tk().withdraw()
         tk.messagebox.showerror("Erro de configuração", str(e))

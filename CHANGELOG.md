@@ -3,7 +3,30 @@ created: 2025-10-21T14:50
 updated: 2025-10-29T15:21
 ---
 # Changelog
-Todas as mudanças notáveis neste projeto serão documentadas neste arquivo.
+Todas as mudanças neste projeto serão documentadas neste arquivo.
+
+## [1.0] - 2025-12-18
+Contribuintes: Solivan A. dos Santos
+### Added
+- Modo de Busca por Competência ou Emissão
+- Modo de Cadastro por CNPJ ou Código
+- Opção de resetar os NSU de todas as empresas cadastradas
+- Notas canceladas agora são zeradas no relatório excel
+- Inserido atualização recursiva das planilhas em caso de alteração do VBA ou planilha mãe, em /docs/att_planilhas.py
+
+### Fixed
+- Não pula mais NFSe nas mudanças de lote
+- Corrigido a perca de arquivos no reprocessamento de períodos já solicitados
+- Corrigido os retornos visuais nas planilha de relatórios
+- Agora permite deletar normalmente empresas que não possuem certificado cadastrado
+- Janelas modais agora são fixadas e ficam em primeiro plano, movimento unificado em bloco
+
+### Changed
+- CNPJ agora aceita caracteres alfanuméricos
+- Arquivos baixados começa com Prefixo definido + NSU-[n° do NSU], assim ficando mais fácil verificar a falta de arquivos durante o processo
+
+### Removed
+- Removido o campo de Úlitmo NSU Verificado
 
 ## [0.5.5] – 2025-10-29
 ### Fixed

@@ -11,11 +11,12 @@ import win32com.client as win32
 from pathlib import Path
 import pythoncom
 from tkinter import ttk, messagebox, filedialog
-from datetime import datetime, timedelta  # Remover 'time' daqui
+from datetime import datetime, timedelta
 ## Módulos auxiliares
 from config.config import DIRETORIOS, ROOT_DIR, Config
 from config.utils import formatar_cnpj
-from downloader.main_d import NFSeDownloader
+from downloader.emissao import NFSeDownloaderEmissao
+from downloader.competencia import NFSeDownloaderCompetencia
 from ui.ui_basic import PopupProcessamento, notificar_windows, modal_window, scrolled_treeview, buttons_frame, back_window
 from config.config import Config
 from config.json_handler import carregar_cadastros
@@ -37,6 +38,7 @@ class DownloadUI:
         self.resultados = []
         self.contador_nfse_global = 0
         self.empresas_selecionadas = []
+        self.indice_cnpj = {}  # Adicionar este
         
         self._setup_ui()
 
@@ -51,6 +53,9 @@ class DownloadUI:
             back_window(self.win, self.parent.root)
             return
 
+        # Criar índice rápido de CNPJ para exportação
+        self._criar_indice_cnpj()
+        
         self._criar_treeview()
         self._criar_filtros()
         self._criar_botoes()
@@ -63,9 +68,9 @@ class DownloadUI:
     def _criar_treeview(self):
         """Cria a treeview de empresas"""
         columns_config = [
-            ("cod", "Código", 80, "center"),
-            ("empresa", "Empresa", 200, "center"),
-            ("cnpj", "CNPJ", 150, "center")
+            ("cod", "Código", 80, "center", "int"),
+            ("empresa", "Empresa", 200, "center", "string"), 
+            ("cnpj", "CNPJ", 150, "center", "string") 
         ]
         
         self.tree, scrollbar, frame_tree = scrolled_treeview(
@@ -77,9 +82,11 @@ class DownloadUI:
 
         # Configurar tags para formatação condicional
         self.tree.tag_configure('vencido', foreground='red', font=('TkDefaultFont', 9, 'bold'))
+        self.tree.tag_configure('vencido_selecionado', foreground='white', background='red', font=('TkDefaultFont', 9, 'bold'))
         self.tree.tag_configure('normal', foreground='black')
+        self.tree.tag_configure('selecionado', foreground='white', background='blue')
 
-        # Configurar evento de clique
+        # Configurar eventos
         self.tree.bind('<Button-1>', self._on_treeview_click)
         self.tree.bind('<<TreeviewSelect>>', self._on_tree_select)
         self.tree.bind('<KeyPress>', self._on_key_press)
@@ -186,6 +193,13 @@ class DownloadUI:
 
     def _on_treeview_click(self, event):
         """Alterna a seleção individual dos itens ao clicar"""
+        # Verificar se o clique foi na região do cabeçalho
+        region = self.tree.identify_region(event.x, event.y)
+        
+        if region == "heading":
+            # Se foi no cabeçalho, não faz nada - deixa a ordenação padrão funcionar
+            return
+        
         item = self.tree.identify_row(event.y)
         if item:
             # Verificar se o item tem certificado vencido
@@ -307,52 +321,151 @@ class DownloadUI:
             logger.error(f"Traceback: {traceback.format_exc()}")
             return None
 
-    ## ------------------------------------------------------------------------------
-    ## Exportar pacotes
-    ## ------------------------------------------------------------------------------
+## ------------------------------------------------------------------------------
+## Exportar pacotes
+## ------------------------------------------------------------------------------
     def _exportar_nfse(self):
-        """Função para exportar arquivos .zip das empresas selecionadas"""
+        """Função para exportar arquivos .zip das empresas selecionadas com base no save_mode configurado"""
         selecionados = self.tree.selection()
         if not selecionados:
             return
             
+        # Carregar configurações
+        config = Config.load(DIRETORIOS['config_json'])
+        save_mode = getattr(config, 'save_mode')
+        
+        logger.info(f"Iniciando exportação com save_mode: {save_mode}")
+        
         destino = filedialog.askdirectory(title="Selecione a pasta para exportar os arquivos ZIP")
         if not destino:
             return
         
         empresas_exportadas = []
         empresas_nao_encontradas = []
+        empresas_erro_renomeacao = []
         
+        # Criar pasta temporária para cópias renomeadas
+        pasta_temp = os.path.join(DIRETORIOS['temp'], "export_temp")
+        if os.path.exists(pasta_temp):
+            shutil.rmtree(pasta_temp)
+        os.makedirs(pasta_temp, exist_ok=True)
+        
+        # Processar cada empresa selecionada
         for item in selecionados:
             values = self.tree.item(item, 'values')
             cod_empresa = values[0]
             nome_empresa = values[1]
             
-            nome_arquivo = f"{cod_empresa}.zip"
-            caminho_origem = os.path.join(DIRETORIOS['notas'], nome_arquivo)
+            nome_arquivo_origem = f"{cod_empresa}.zip"
+            caminho_origem = os.path.join(DIRETORIOS['notas'], nome_arquivo_origem)
             
-            if os.path.exists(caminho_origem):
-                caminho_destino = os.path.join(destino, nome_arquivo)
-                shutil.copy2(caminho_origem, caminho_destino)
-                # Adicionar código entre colchetes
-                empresas_exportadas.append(f"[{cod_empresa}] {nome_empresa}")
-            else:
-                # Adicionar código entre colchetes
+            if not os.path.exists(caminho_origem):
                 empresas_nao_encontradas.append(f"[{cod_empresa}] {nome_empresa}")
+                continue
+            
+            try:
+                # Determinar nome final baseado no save_mode
+                if save_mode == 'CNPJ':
+                    # Usar índice para busca rápida
+                    cnpj_limpo = self.indice_cnpj.get(cod_empresa)
+                    if cnpj_limpo:
+                        nome_arquivo_destino = f"{cnpj_limpo}.zip"
+                    else:
+                        # Fallback: buscar no cadastro
+                        cadastro = self._buscar_cadastro_empresa(cod_empresa)
+                        if cadastro and 'cnpj' in cadastro:
+                            cnpj_formatado = cadastro['cnpj'].replace('.', '').replace('/', '').replace('-', '')
+                            nome_arquivo_destino = f"{cnpj_formatado}.zip"
+                            # Atualizar índice
+                            self.indice_cnpj[cod_empresa] = cnpj_formatado
+                        else:
+                            logger.warning(f"CNPJ não encontrado para empresa {cod_empresa}. Usando código como fallback.")
+                            nome_arquivo_destino = nome_arquivo_origem
+                else:
+                    # Modo código (default)
+                    nome_arquivo_destino = nome_arquivo_origem
+                
+                # Criar cópia temporária renomeada
+                caminho_temp = os.path.join(pasta_temp, nome_arquivo_destino)
+                shutil.copy2(caminho_origem, caminho_temp)
+                
+                # Copiar da pasta temporária para o destino final
+                caminho_destino = os.path.join(destino, nome_arquivo_destino)
+                shutil.copy2(caminho_temp, caminho_destino)
+                
+                # Adicionar à lista de exportadas com formato adequado
+                if save_mode == 'cnpj':
+                    # Mostrar transformação apenas se CNPJ foi encontrado
+                    cnpj_usado = self.indice_cnpj.get(cod_empresa, '')
+                    if cnpj_usado:
+                        empresas_exportadas.append(f"[{cod_empresa}] {nome_empresa} -> {cnpj_usado}.zip")
+                    else:
+                        empresas_exportadas.append(f"[{cod_empresa}] {nome_empresa}")
+                else:
+                    empresas_exportadas.append(f"[{cod_empresa}] {nome_empresa}")
+                    
+                logger.info(f"Exportado: {cod_empresa} -> {nome_arquivo_destino}")
+                
+            except Exception as e:
+                logger.error(f"Erro ao exportar empresa {cod_empresa}: {e}")
+                empresas_erro_renomeacao.append(f"[{cod_empresa}] {nome_empresa}")
         
-        mensagem = f"Exportação de arquivos ZIP:\n\n"
+        # Limpar pasta temporária
+        try:
+            shutil.rmtree(pasta_temp)
+            logger.info(f"Pasta temporária limpa: {pasta_temp}")
+        except Exception as e:
+            logger.warning(f"Erro ao limpar pasta temporária: {e}")
+        
+        # Construir mensagem de resultado
+        mensagem = f"Exportação de arquivos ZIP ({save_mode}):\n\n"
         
         if empresas_exportadas:
             mensagem += f"✅ {len(empresas_exportadas)} arquivo(s) exportado(s):\n"
-            mensagem += "\n".join(f"  • {emp}" for emp in empresas_exportadas)
+            mensagem += "\n".join(f"  • {emp}" for emp in empresas_exportadas[:10])  # Limitar a 10 itens
+            if len(empresas_exportadas) > 10:
+                mensagem += f"\n  ... e mais {len(empresas_exportadas) - 10} arquivos"
         
         if empresas_nao_encontradas:
             if empresas_exportadas:
                 mensagem += "\n\n"
             mensagem += f"❌ {len(empresas_nao_encontradas)} arquivo(s) não encontrado(s):\n"
-            mensagem += "\n".join(f"  • {emp}" for emp in empresas_nao_encontradas)
-
+            mensagem += "\n".join(f"  • {emp}" for emp in empresas_nao_encontradas[:5])
+            if len(empresas_nao_encontradas) > 5:
+                mensagem += f"\n  ... e mais {len(empresas_nao_encontradas) - 5} arquivos"
+        
+        if empresas_erro_renomeacao:
+            if empresas_exportadas or empresas_nao_encontradas:
+                mensagem += "\n\n"
+            mensagem += f"⚠️ {len(empresas_erro_renomeacao)} erro(s) de processamento:\n"
+            mensagem += "\n".join(f"  • {emp}" for emp in empresas_erro_renomeacao)
+        
+        if not empresas_exportadas and not empresas_nao_encontradas and not empresas_erro_renomeacao:
+            mensagem += "⚠️ Nenhuma empresa processada."
+        
+        # Adicionar nota sobre CNPJ formatado
+        if save_mode == 'cnpj':
+            mensagem += "\n\n📝 Nota: CNPJs exportados sem pontuação (formato: 12345678000195)"
+        
         messagebox.showinfo("Exportação Concluída", mensagem)
+        logger.info(f"Exportação concluída. Modo: {save_mode}, Exportados: {len(empresas_exportadas)}")
+
+    def _criar_indice_cnpj(self):
+        """Cria índice rápido código->CNPJ para exportação"""
+        self.indice_cnpj = {}
+        
+        try:
+            for key in self.data.keys():
+                if key.startswith('cadastro_'):
+                    cadastro = self.data[key]
+                    cod = str(cadastro.get('cod', ''))
+                    cnpj = cadastro.get('cnpj', '')
+                    if cod and cnpj:
+                        # Remover pontuação do CNPJ
+                        cnpj_limpo = cnpj.replace('.', '').replace('/', '').replace('-', '')
+                        self.indice_cnpj[cod] = cnpj_limpo
+        except Exception as e:
+            logger.error(f"Erro ao criar índice CNPJ: {e}")
 
     ## ------------------------------------------------------------------------------
     ## Processos do download e compactação
@@ -464,7 +577,7 @@ class DownloadUI:
     def _atualizar_contador_nfse(self, incremento=1):
         """Atualiza o contador global de NFSe"""
         self.contador_nfse_global += incremento
-        if hasattr(self, 'popup') and self.popup and self.popup.winfo_exists():
+        if hasattr(self, 'popup') and self.popup and hasattr(self.popup, 'winfo_exists') and self.popup.winfo_exists():
             self.win.after(0, lambda: self.popup.atualizar_contador_nfse(self.contador_nfse_global))
 
     def _baixar_nfse(self):
@@ -603,6 +716,10 @@ class DownloadUI:
             nome_empresa = empresa['nome']
             cadastro = empresa['cadastro']
             
+            # Carregar configurações
+            config = Config.load(DIRETORIOS['config_json'])
+            consult_mode = getattr(config, 'consult_mode')  # Default para Emissão
+            
             # Verificação de segurança - garantir que o certificado não está vencido
             if self._verificar_certificado_vencido(cadastro):
                 error_msg = f"Certificado vencido para {nome_empresa}. Download cancelado."
@@ -630,7 +747,7 @@ class DownloadUI:
                     'mensagem': f"Pasta da empresa {cod_empresa} não encontrada. Refazer cadastro."
                 }            
             
-            nsu_competencia_file = os.path.join(pasta_empresa, 'nsu_competencia.json')
+            arquivo_controle = os.path.join(pasta_empresa, 'nsu_competencia.json')
             
             config_empresa = Config.load(DIRETORIOS['config_json'])
             config_empresa.cert_path = cert_path
@@ -638,7 +755,13 @@ class DownloadUI:
             config_empresa.cnpj = cnpj
             config_empresa.output_dir = pasta_empresa
             
-            downloader = NFSeDownloader(config_empresa)
+            # ALTERAÇÃO: Instanciar o downloader correto conforme o modo
+            if consult_mode == 'Emissão':
+                from downloader.emissao import NFSeDownloaderEmissao
+                downloader = NFSeDownloaderEmissao(config_empresa)
+            else:  # Competência
+                from downloader.competencia import NFSeDownloaderCompetencia
+                downloader = NFSeDownloaderCompetencia(config_empresa)
             
             # Variável local para armazenar o NSU atual
             nsu_atual_local = 0
@@ -655,15 +778,17 @@ class DownloadUI:
                     self._atualizar_contador_nfse(1)
                 
                 # Extrai o NSU da mensagem se disponível
-                if "NSU:" in msg:
+                if "NSU:" in msg or "Consultando NSU:" in msg:
                     try:
                         # Exemplo de mensagem: "Consultando NSU: 12345"
-                        nsu_atual_local = int(msg.split("NSU:")[1].strip().split()[0])
+                        if "NSU:" in msg:
+                            nsu_str = msg.split("NSU:")[1].strip().split()[0]
+                            nsu_atual_local = int(nsu_str)
                     except (IndexError, ValueError):
                         pass  # Ignora se não conseguir extrair o NSU
                 
                 # Atualiza o contador com o NSU atual
-                if hasattr(self, 'popup') and self.popup and self.popup.winfo_exists():
+                if hasattr(self, 'popup') and self.popup and hasattr(self.popup, 'winfo_exists') and self.popup.winfo_exists():
                     self.win.after(0, lambda: self.popup.atualizar_contador(
                         self.empresa_atual_index,
                         self.total_empresas,
@@ -671,43 +796,64 @@ class DownloadUI:
                     ))
             
             logger.info(f"Iniciando download para {nome_empresa} - Competência: {mes}/{ano}")
+            logger.info(f"Modo de consulta: {consult_mode}")
             
-            documentos_baixados = downloader.run_por_competencia(
-                ano=ano,
-                mes=mes,
-                nsu_competencia_file=nsu_competencia_file,
-                write=write_progress
-            )
-            
-            logger.info(f"Download concluído para [{empresa['cod']}] {nome_empresa}: {documentos_baixados} documentos")
-                        
-            write_progress(f"Download concluído. Total de documentos baixados: {documentos_baixados}")
-            
-            return {
-                'cod': cod_empresa,
-                'empresa': nome_empresa,
-                'documentos': documentos_baixados,
-                'erros': 0,
-                'mensagem': f"Sucesso: {documentos_baixados} documentos baixados"
-            }
+            try:
+                if consult_mode == 'Emissão':
+                    documentos_baixados = downloader.run_emissao(
+                        ano=ano,
+                        mes=mes,
+                        nsu_competencia_file=arquivo_controle,
+                        write=write_progress
+                    )
+                elif consult_mode == 'Competência':
+                    documentos_baixados = downloader.run_competencia(
+                        ano_compet=ano,
+                        mes_compet=mes,
+                        nsu_competencia_file=arquivo_controle,
+                        write=write_progress
+                    )
+                else:
+                    error_msg = f"Modo de consulta desconhecido: {consult_mode}"
+                    logger.error(error_msg)
+                    return {
+                        'cod': cod_empresa,
+                        'empresa': nome_empresa,
+                        'documentos': 0,
+                        'erros': 1,
+                        'mensagem': error_msg
+                    }
+                
+                logger.info(f"Download concluído para [{cod_empresa}] {nome_empresa}: {documentos_baixados} documentos")
+                write_progress(f"Download concluído. Total de documentos baixados: {documentos_baixados}")
+                
+                return {
+                    'cod': cod_empresa,
+                    'empresa': nome_empresa,
+                    'documentos': documentos_baixados,
+                    'erros': 0,
+                    'mensagem': f"Sucesso: {documentos_baixados} documentos baixados"
+                }
+                    
+            except Exception as e:
+                error_msg = f"Erro durante download para {nome_empresa}: {str(e)}"
+                logger.error(error_msg)
+                logger.exception("Detalhes do erro:")  # Log completo do stack trace
+                return {
+                    'cod': cod_empresa,
+                    'empresa': nome_empresa,
+                    'documentos': 0,
+                    'erros': 1,
+                    'mensagem': error_msg
+                }
                 
         except Exception as e:
             error_msg = f"Erro ao baixar para {empresa['nome']}: {str(e)}"
             logger.error(error_msg)
+            logger.exception("Detalhes do erro:")
             return {
-                'cod': empresa['cod'],
-                'empresa': empresa['nome'],
-                'documentos': 0,
-                'erros': 1,
-                'mensagem': error_msg
-            }
-                
-        except Exception as e:
-            error_msg = f"Erro ao baixar para {empresa['nome']}: {str(e)}"
-            logger.error(error_msg)
-            return {
-                'cod': empresa['cod'],  # Adicionar código aqui
-                'empresa': empresa['nome'],
+                'cod': empresa.get('cod', 'N/A'),
+                'empresa': empresa.get('nome', 'N/A'),
                 'documentos': 0,
                 'erros': 1,
                 'mensagem': error_msg

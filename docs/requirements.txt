@@ -1,0 +1,8 @@
+requests
+cryptography
+openpyxl
+pywin32
+tkhtmlview
+markdown
+plyer
+

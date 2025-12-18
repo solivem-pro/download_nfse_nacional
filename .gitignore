@@ -1,0 +1,7 @@
+!packs/0/**
+logs/*
+*.pfx
+*.pem
+config/cadastros.json
+build/
+dist/
