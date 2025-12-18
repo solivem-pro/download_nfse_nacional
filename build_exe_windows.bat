@@ -22,7 +22,7 @@ copy /Y docs\LICENSE dist\
 
 echo Copiando instalador.py e requirements.txt para dist\download_nfse...
 copy /Y 1.instalador.py dist\download_nfse\
-copy /Y requirements.txt dist\download_nfse\
+copy /Y README.md dist\download_nfse\
 
 echo Concluido! Executavel criado em: dist\download_nfse\
 pause
