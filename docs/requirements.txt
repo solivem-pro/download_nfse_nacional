@@ -2,7 +2,5 @@ requests
 cryptography
 openpyxl
 pywin32
-tkhtmlview
-markdown
-plyer
-
+PySide6>=6.7
+python-dateutil

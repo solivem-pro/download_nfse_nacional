@@ -1,8 +1,0 @@
-{
-  "file_prefix": "NFSE",
-  "download_pdf": true,
-  "delay_seconds": 3.0,
-  "timeout": 30.0,
-  "consult_mode": "Emissão",
-  "save_mode": "CNPJ"
-}

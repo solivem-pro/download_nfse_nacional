@@ -39,6 +39,7 @@ _DIR_PATHS = {
 
 _DIR_FILES = {
     'planilha_modelo': _DIR_PATHS['config'] / 'relatorio.xlsm',
+    'cadastros_db': _DIR_PATHS['config'] / 'cadastros.db',
     'config_json': _DIR_PATHS['config'] / 'config.json',
     'cadastros_json': _DIR_PATHS['config'] / 'cadastros.json',
     'icone': _DIR_PATHS['config'] / 'icone.ico',

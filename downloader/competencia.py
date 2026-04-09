@@ -14,7 +14,9 @@ import xml.etree.ElementTree as ET
 import requests
 
 ## Módulos auxiliares
-from downloader.pdf import NFSePDFDownloader
+from downloader.eventos import ParallelEventDownloader, EventDownloadTask, EventFetchResult
+from downloader.nfse_files import build_nfse_file_info, move_document_to_canceladas
+from downloader.pdf import ParallelPDFDownloader, PDFDownloadTask
 from config.config import Config, STATUS_STOP, MAX_TENT
 
 logger = logging.getLogger(__name__)
@@ -40,6 +42,14 @@ class NFSeDownloaderCompetencia:
         self.session: Optional[requests.Session] = None
         self.base_url = "https://adn.nfse.gov.br/contribuintes/DFe"
         self._running = True
+        self.pdf_stats_last_run = {"sucessos": 0, "falhas": 0, "erro": None}
+        self.event_stats_last_run = {
+            "salvos": 0,
+            "sem_evento": 0,
+            "falhas": 0,
+            "cancelamentos": 0,
+            "erro": None,
+        }
 
     def stop(self):
         """Para a execução do download"""
@@ -120,6 +130,12 @@ class NFSeDownloaderCompetencia:
         """Determina se o documento é PRESTADO, TOMADO ou EVENTO"""
         try:
             root = ET.fromstring(xml_bytes)
+
+            for tag in ('{*}evento', '{*}Evento', '{*}InfEvento', '{*}infEvento', '{*}pedRegEvento'):
+                if root.find(f'.//{tag}') is not None:
+                    return "EVENTOS"
+
+            cnpj_empresa = "".join(char for char in str(self.config.cnpj or "") if char.isdigit())
             
             # Tentar encontrar o CNPJ do prestador
             cnpj_prestador = None
@@ -129,12 +145,12 @@ class NFSeDownloaderCompetencia:
                             './/{*}Prestador/{*}Cnpj', './/{*}infDPS/{*}prest/{*}CNPJ']:
                 element = root.find(cnpj_tag)
                 if element is not None and element.text:
-                    cnpj_prestador = element.text.strip()
+                    cnpj_prestador = "".join(char for char in element.text.strip() if char.isdigit())
                     break
             
             # Se encontrou CNPJ do prestador, comparar com CNPJ da empresa
             if cnpj_prestador:
-                if cnpj_prestador == self.config.cnpj:
+                if cnpj_prestador == cnpj_empresa:
                     return "PRESTADOS"
                 else:
                     return "TOMADOS"
@@ -208,6 +224,8 @@ class NFSeDownloaderCompetencia:
         for pasta in pastas:
             pasta_path = os.path.join(self.config.output_dir, pasta)
             os.makedirs(pasta_path, exist_ok=True)
+            if pasta in {"PRESTADOS", "TOMADOS"}:
+                os.makedirs(os.path.join(pasta_path, "Canceladas"), exist_ok=True)
 
     def registrar_erro(self, nsu: int, chave: str, tipo: str, descricao: str, 
                       ano_compet: str = None, mes_compet: str = None):
@@ -396,13 +414,68 @@ class NFSeDownloaderCompetencia:
         intervalos_por_mes = {}  # chave: (ano, mes), valor: {"nsu_inicial": int, "nsu_final": int}
 
         # Configurar sessão
+        self.pdf_stats_last_run = {"sucessos": 0, "falhas": 0, "erro": None}
+        self.event_stats_last_run = {
+            "salvos": 0,
+            "sem_evento": 0,
+            "falhas": 0,
+            "cancelamentos": 0,
+            "erro": None,
+        }
+
         with self.pfx_to_pem() as pem_cert:
             self.session = requests.Session()
             self.session.cert = pem_cert
             self.session.verify = True
-            
+
+            pdf_pipeline = None
+            event_pipeline = None
+            chaves_evento_enfileiradas: set[str] = set()
+            documentos_cancelados: list[EventDownloadTask] = []
+
             if self.config.download_pdf:
-                pdf_dl = NFSePDFDownloader(self.session, self.config.timeout)
+                def _on_pdf_success(task: PDFDownloadTask) -> None:
+                    self.logger.info("PDF baixado (%s): %s", task.tipo_documento, task.chave)
+
+                def _on_pdf_failure(task: PDFDownloadTask, reason: str) -> None:
+                    self.logger.error("Falha ao baixar PDF %s: %s", task.chave, reason)
+                    self.registrar_erro(task.nsu, task.chave, "PDF", reason, task.ano, task.mes)
+
+                pdf_pipeline = ParallelPDFDownloader(
+                    pem_cert=pem_cert,
+                    timeout=self.config.timeout,
+                    delay_seconds=max(1.5, float(self.config.delay_seconds)),
+                    max_retries=3,
+                    retry_backoff=2.0,
+                    logger_instance=self.logger,
+                    on_success=_on_pdf_success,
+                    on_failure=_on_pdf_failure,
+                )
+
+            def _on_event_success(task: EventDownloadTask, result: EventFetchResult) -> None:
+                extra = " com cancelamento" if result.cancelamento else ""
+                self.logger.info("Evento salvo (%s)%s: %s", task.tipo_documento, extra, task.chave)
+                if result.cancelamento:
+                    documentos_cancelados.append(task)
+
+            def _on_event_empty(task: EventDownloadTask) -> None:
+                self.logger.debug("Nenhum evento localizado para a chave %s", task.chave)
+
+            def _on_event_failure(task: EventDownloadTask, reason: str) -> None:
+                self.logger.error("Falha ao buscar eventos %s: %s", task.chave, reason)
+                self.registrar_erro(task.nsu, task.chave, "EVENTO", reason, task.ano, task.mes)
+
+            event_pipeline = ParallelEventDownloader(
+                pem_cert=pem_cert,
+                timeout=self.config.timeout,
+                delay_seconds=max(2.0, float(self.config.delay_seconds)),
+                max_retries=3,
+                retry_backoff=2.0,
+                logger_instance=self.logger,
+                on_success=_on_event_success,
+                on_empty=_on_event_empty,
+                on_failure=_on_event_failure,
+            )
             
             try:
                 while self.running() and tent_post < MAX_TENT:
@@ -493,12 +566,13 @@ class NFSeDownloaderCompetencia:
                                         # Determinar tipo do documento
                                         tipo_documento = self.determinar_tipo_documento(xml_bytes)
                                         self.logger.info(f"Documento {chave} classificado como: {tipo_documento} - Motivo: {motivo}")
+                                        file_info = build_nfse_file_info(xml_bytes, chave, nsu_item)
                                         
                                         # Baixar arquivo
                                         pasta_tipo = os.path.join(self.config.output_dir, tipo_documento)
                                         filename = os.path.join(
                                             pasta_tipo, 
-                                            f"{self.config.file_prefix}_NSU-{nsu_item}_{chave}.xml"
+                                            f"{file_info.basename}.xml"
                                         )
                                         
                                         # Salvar XML
@@ -508,18 +582,46 @@ class NFSeDownloaderCompetencia:
                                         documentos_baixados += 1
                                         write(f"XML baixado ({tipo_documento}): {chave} (NSU: {nsu_item}) - Motivo: {motivo}")
                                         
-                                        # Baixar PDF se configurado
-                                        if self.config.download_pdf:
+                                        # Enfileirar PDF em paralelo para nao segurar o loop de NSU
+                                        if pdf_pipeline is not None:
                                             pdf_file = os.path.join(
                                                 pasta_tipo,
-                                                f"{self.config.file_prefix}_{nsu_item}_{chave}.pdf",
+                                                f"{file_info.basename}.pdf",
                                             )
-                                            if pdf_dl.baixar(chave, pdf_file):
-                                                self.logger.info(f"PDF baixado ({tipo_documento}): {chave}")
-                                            else:
-                                                self.logger.error(f"Falha ao baixar PDF: {chave}")
-                                                self.registrar_erro(nsu_item, chave, "PDF", "Falha no download", 
-                                                                  ano_compet, mes_compet)
+                                            pdf_pipeline.enqueue(
+                                                PDFDownloadTask(
+                                                    chave=chave,
+                                                    dest_path=pdf_file,
+                                                    nsu=nsu_item,
+                                                    ano=ano_compet,
+                                                    mes=mes_compet,
+                                                    tipo_documento=tipo_documento,
+                                                )
+                                            )
+
+                                        if (
+                                            event_pipeline is not None
+                                            and tipo_documento != "EVENTOS"
+                                            and chave not in chaves_evento_enfileiradas
+                                        ):
+                                            event_file = os.path.join(
+                                                self.config.output_dir,
+                                                "EVENTOS",
+                                                f"Evento - {file_info.numero} - {chave}.xml",
+                                            )
+                                            event_pipeline.enqueue(
+                                                EventDownloadTask(
+                                                    chave=chave,
+                                                    dest_path=event_file,
+                                                    nsu=nsu_item,
+                                                    ano=ano_compet,
+                                                    mes=mes_compet,
+                                                    tipo_documento=tipo_documento,
+                                                    document_paths=(filename, pdf_file if pdf_pipeline is not None else ""),
+                                                    canceladas_dir=os.path.join(pasta_tipo, "Canceladas"),
+                                                )
+                                            )
+                                            chaves_evento_enfileiradas.add(chave)
                                     else:
                                         # Documento não é do mês escolhido (nem por competência, nem por emissão)
                                         self.logger.info(f"Documento fora do período: {mes_doc_compet}/{ano_doc_compet} - {mes_doc_emissao}/{ano_doc_emissao}")
@@ -581,6 +683,44 @@ class NFSeDownloaderCompetencia:
                     time.sleep(self.config.delay_seconds)
                     
             finally:
+                if event_pipeline is not None:
+                    self.event_stats_last_run = event_pipeline.finish()
+
+                    if self.event_stats_last_run["erro"] is not None:
+                        self.logger.error(
+                            "Worker de eventos finalizado com erro: %s",
+                            self.event_stats_last_run["erro"],
+                        )
+
+                    self.logger.info(
+                        "Resumo eventos - salvos: %s | sem evento: %s | falhas: %s | cancelamentos: %s",
+                        self.event_stats_last_run["salvos"],
+                        self.event_stats_last_run["sem_evento"],
+                        self.event_stats_last_run["falhas"],
+                        self.event_stats_last_run["cancelamentos"],
+                    )
+
+                if pdf_pipeline is not None:
+                    self.pdf_stats_last_run = pdf_pipeline.finish()
+
+                    if self.pdf_stats_last_run["erro"] is not None:
+                        self.logger.error(
+                            "Worker de PDF finalizado com erro: %s",
+                            self.pdf_stats_last_run["erro"],
+                        )
+
+                    self.logger.info(
+                        "Resumo PDF - sucessos: %s | falhas: %s",
+                        self.pdf_stats_last_run["sucessos"],
+                        self.pdf_stats_last_run["falhas"],
+                    )
+
+                for cancelado in documentos_cancelados:
+                    for document_path in cancelado.document_paths:
+                        if not document_path:
+                            continue
+                        move_document_to_canceladas(document_path, cancelado.canceladas_dir)
+
                 # Atualizar o arquivo JSON com os intervalos coletados
                 self.atualizar_arquivo_competencia(nsu_competencia_file, intervalos_por_mes, ano_compet, mes_compet)
                 

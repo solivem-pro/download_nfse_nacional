@@ -1,73 +1,107 @@
-# Documentação do Baixar NFS-e Portal Nacional
+# Download NFS-e Portal Nacional
 
-## Visão Geral
-- [IMPORTANTE] Funcional apenas no Windowns
-- Esse é um programa que capta os arquivo [.xml] e [.pdf] NFSe do Portal Nacional a partir do NSU de cada empresa cadastrada.
-- O NSU é o Número Sequencial Único, cada empresa, seja prestadora ou emissora, possui contagem própria que inicia em 1 e segue aumentando em 1 a cada nota (emitida ou tomada, mesma contagem).
-- Por meio da API fornecida pelo próprio governo, o processo foi automatizado e é controlado individualmente por empresa.
-- Cada empresa deve ser cadastrada manualmente e posteriormente executada definindo a competência escolhida para os arquivo serem baixados. Ao final dos processos, os arquivos podem ser exportados. Só é exportável o último período processado.
-- No menu [Configurações] há algumas opções de configuração básica, como se serão baixados o arquivo [.pdf], método de busca e de exportação.
-- Como se trata de um projeto em fase de teste não exime de verificação humana referente a quantidade de arquivos e dados. Qualquer fator de correção favor entrar em contato.
-- É possível alterar o [vba.bas] se necessário, para replicar em massa a todas as planilhas basta executar [att_planilhas.py] que as atualizações são aplicadas a todas empresas cadastradas.
-- Seguindo a mesma lógica, se for necessário alterar o relatório mãe em /packs/0 e executar [att_planilhas.py] para replicar as mudanças
+Aplicacao desktop para consulta, cadastro e download de NFS-e no Portal Nacional.
 
------------------
+## Estado atual
 
-## Menus
-### 1. Baixar NFSe
-1. Tabela das empresas cadastradas, ordenada por ordem crescente de código, mas permite sortear pelas colunas
-2. Ano e mês: escolher a competência que serão baixados os arquivos.
-3. Selec. Todos: seleciona todas as empresas, para selecionar ou desmarcar individualmente basta clicar na desejada que a marcação é alternada.
-4. Baixar: baixa as selecionadas. Apenas ativada quando há pelo menos uma selecionada.
-5. Exportar: exporta o arquivo compacto das selecionadas. Apenas ativado quando há pelo menos uma selecionada.
-6. Voltar: Volta para o menu principal.
-- Ao baixar um popup de processamento é iniciado com contador do progresso.
-- Ao exportar é gerado um arquivo [.zip], com:
-	- As pastas com [.xml] e [.pdf]:
-		- PRESTADOS
-		- TOMADOS
-		- EVENTOS (geralmente notas canceladas, podem ser prestados ou tomados)
-	- nsu_competencia.json: mostra os registros dos NSU por competência, usar apenas caso necessário e conferência.
-	- erros.txt: registra os erros durante operação de download.
-	- relatório_{cod}.xlsm: relatório em planilha divida em 3 abas:
-		- TOMADOS
-		- PRESTADOS
-		- EVENTOS
+- Interface principal em `PySide6`
+- Entrada oficial da aplicacao em `download_nfse_qt.py`
+- Build Windows em `build_exe_windows.bat`
+- Backend de download, configuracao e cadastros mantido no projeto atual
 
----
+## Requisitos
 
-### 2. Cadastro
-1. Adicionar: Clique em adicionar para criar uma nova empresa para controle. Devem ser completados todos os campos para registrar:
-	1. Código: numérico e único pra empresa, só pode ser alterado na criação da empresa
-	2. Empresa: nome de identificação da empresa
-	3. CNPJ: CNPJ da empresa, possui formatação automática no campo, portanto aceita entrada formatada. Único por empresa.
-	4. Importar Certificado (.pfx): é necessário escolher um certificado válido para realizar o download dos arquivos, ele é importado como cópia para pasta interna.
-	5. Senha Certificado: senha de acesso do certificado importado.
-2. Editar: se precisar editar alguma informação ou atualizar o cadastro da empresa. Selecione uma empresa para habilitar a edição.
-3. Editar NSU: todos os registros de NSU da empresa estarão neste submenu:
-	1. Tabela ordenada por competência da mais atual para a mais antiga.
-	2. Adicionar: para adicionar é necessário preencher todos os campos
-	3. Excluir: deleta o registro selecionado. Só habilitado ao selecionar uma competência.
-	4. Excluir Todos: deleta dos registros todas as competência da empresa atual.
-	5. Voltar: volta para a janela anterior.
-	- Campos de edição, servem para adicionar uma competência nova ou sobrescrever uma já existente.
-4. Resetar NSUs: reseta os NSUs de todas as empresas, usar somente em caso de erro persistente em várias empresas.
-5. Excluir: deleta o cadastro da empresa selecionada. Só habilitado ao selecionar uma competência.
-6. Excluir Todos: deleta todas as empresas cadastradas.
-7. Voltar: Voltar para a janela principal
+- Windows
+- Python com suporte as dependencias de `requirements.txt`
+- Microsoft Excel instalado, se voce pretende usar o pos-processamento completo das planilhas
 
------------
+## Instalacao
 
-### 3. Configurações
+Instale as dependencias do projeto:
 
-1. Prefixo Arquivo: como os arquivos [.xml] e [.pdf] serão iniciados
-2. Delay(s): tempo entre lotes, afeta bloqueios de certificado
-3. Timeout(s): quantos segundos o programa esperará ao máximo para obter resposta do servidor da API
-4. Modo de Consulta: se a busca será por Emissão ou Competência. Em competência ele buscará também pela emissão a fim de evitar perdas de NFSe. Busca até 6 meses a frente do solicitado.
-5. Modo de Cadastros: Altera a forma com que o arquivo [.zip] é exportado por CNPJ ou Código. Versátil para integrações de sistemas.
-6. Baixar PDF: se marcado baixa os arquivos [.pdf] da DANFSe. Devido a instabilidades do servidor pode ocorrer de não baixar.
+```powershell
+pip install -r requirements.txt
+```
 
+## Como abrir
 
-[Repositório no GitHub](https://github.com/solivem-pro/download_nfse_nacional)
+Execute a interface principal:
 
+```powershell
+python download_nfse_qt.py
+```
 
+## Build Windows
+
+Para gerar o executavel, execute:
+
+```powershell
+build_exe_windows.bat
+```
+
+O script de build:
+
+- instala ou atualiza as dependencias de `requirements.txt`
+- instala `PyInstaller` no ambiente atual
+- limpa artefatos antigos de `build/` e `dist/`
+- gera o executavel em `dist/download_nfse/`
+
+Nesse fluxo, nao e necessario executar `1.instalador.py` para empacotar o projeto.
+
+## Menus principais
+
+### Inicio
+
+- resumo rapido das empresas cadastradas
+- atalhos para `Download`, `Cadastros`, `Configuracoes` e `Documentacao`
+
+### Download
+
+- selecao de empresas por tabela
+- filtros de `Ano`, `Mes` e `Status`
+- execucao do fluxo real de download
+- exportacao de arquivo `.zip` apos o processamento
+- barra de progresso integrada a pagina
+
+### Cadastros
+
+- adicionar empresa
+- editar empresa
+- importar empresas por planilha `.xlsx`
+- editar NSU por empresa
+- resetar NSUs
+- excluir empresa ou limpar todos os cadastros
+- importar certificado `.pfx`
+
+### Configuracoes
+
+- prefixo do arquivo
+- delay entre consultas
+- timeout
+- modo de consulta
+- modo de salvamento
+- opcao de baixar PDFs
+
+## Fluxo recomendado
+
+1. Abra `Configuracoes` e confirme os parametros do ambiente.
+2. Cadastre ou importe as empresas em `Cadastros`.
+3. Revise certificado, senha e vencimento das empresas.
+4. Va para `Download`, selecione o periodo e as empresas desejadas.
+5. Execute o download e, se necessario, exporte o `.zip` ao final.
+
+## Arquivos principais
+
+- `download_nfse_qt.py`: launcher da interface atual
+- `ui_qt/`: camada visual em Qt
+- `downloader/`: regras de download e processamento
+- `config/`: configuracao, banco e persistencia
+- `docs/qt_primeira_execucao.md`: guia rapido de primeira execucao
+
+## Observacoes
+
+- O projeto continua dependendo de configuracao valida de certificado e acesso ao Portal Nacional.
+- Falhas de ambiente, certificado, Excel ou dependencias podem afetar o fluxo completo.
+- Em caso de erro, registre a tela, a acao executada e o traceback para facilitar o diagnostico.
+
+Atualizacao da documentacao: Thiago V. M. dos Santos
