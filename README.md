@@ -13,7 +13,6 @@ Aplicacao desktop para consulta, cadastro e download de NFS-e no Portal Nacional
 
 - Windows
 - Python com suporte as dependencias de `requirements.txt`
-- Microsoft Excel instalado, se voce pretende usar o pos-processamento completo das planilhas
 
 ## Instalacao
 
@@ -44,7 +43,7 @@ O script de build:
 - instala ou atualiza as dependencias de `requirements.txt`
 - instala `PyInstaller` no ambiente atual
 - limpa artefatos antigos de `build/` e `dist/`
-- gera o executavel em `dist/download_nfse/`
+- gera o executavel unico em `dist/download_nfse.exe`
 
 Nesse fluxo, nao e necessario executar `1.instalador.py` para empacotar o projeto.
 
@@ -60,6 +59,7 @@ Nesse fluxo, nao e necessario executar `1.instalador.py` para empacotar o projet
 - selecao de empresas por tabela
 - filtros de `Ano`, `Mes` e `Status`
 - execucao do fluxo real de download
+- geracao automatica do relatorio PDF por competencia
 - exportacao de arquivo `.zip` apos o processamento
 - barra de progresso integrada a pagina
 
@@ -101,7 +101,6 @@ Nesse fluxo, nao e necessario executar `1.instalador.py` para empacotar o projet
 ## Observacoes
 
 - O projeto continua dependendo de configuracao valida de certificado e acesso ao Portal Nacional.
-- Falhas de ambiente, certificado, Excel ou dependencias podem afetar o fluxo completo.
+- O executavel `onefile` usa `%AppData%\\Portal NFSe` para arquivos internos e a area de trabalho para os downloads visiveis.
+- Falhas de ambiente, certificado ou dependencias podem afetar o fluxo completo.
 - Em caso de erro, registre a tela, a acao executada e o traceback para facilitar o diagnostico.
-
-Atualizacao da documentacao: Thiago V. M. dos Santos

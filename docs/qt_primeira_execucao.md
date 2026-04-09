@@ -4,9 +4,7 @@
 
 - Instale as dependencias do projeto com `pip install -r requirements.txt`.
 - Garanta que o `python` usado para abrir a interface seja o mesmo ambiente onde as dependencias foram instaladas.
-- Se voce pretende usar o pos-processamento completo, confirme que:
-  - `pywin32` esta instalado
-  - o Microsoft Excel esta instalado na maquina
+- O pos-processamento agora e nativo em Python, entao nao depende de Excel na maquina.
 
 ## Como abrir
 
@@ -33,7 +31,6 @@ python download_nfse_qt.py
 
 - certificado `.pfx` invalido ou senha incorreta
 - `openssl` ausente ao tentar fallback de leitura de vencimento
-- Excel ou `pywin32` indisponivel no pos-processamento
 - ambiente Python diferente do ambiente onde as dependencias foram instaladas
 
 ## Se der erro
@@ -44,5 +41,3 @@ Envie:
 - a tela onde aconteceu
 - o botao ou acao que disparou o erro
 - se o erro ocorreu ao abrir a interface ou durante `Download` / `Cadastros`
-
-Atualizado por Thiago V. M. dos Santos

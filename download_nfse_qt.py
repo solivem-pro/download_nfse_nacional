@@ -3,10 +3,11 @@ from __future__ import annotations
 import sys
 
 from config.cadastro_db import initialize_company_database
-from config.config import configurar_logging
+from config.config import configurar_logging, initialize_runtime_environment
 
 
 def main() -> int:
+    initialize_runtime_environment()
     configurar_logging()
     initialize_company_database()
 

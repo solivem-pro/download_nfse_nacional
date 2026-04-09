@@ -17,7 +17,6 @@ def sanitize_company_folder_name(company_name: str | None, cod_empresa: str | in
     if text:
         text = re.sub(INVALID_FS_CHARS, " ", text)
         text = " ".join(text.split()).strip(" .")
-
     return text or f"Empresa {cod_empresa}"
 
 
@@ -44,12 +43,6 @@ def ensure_company_workspace(
     company_name: str | None,
     previous_company_name: str | None = None,
 ) -> tuple[bool, str]:
-    """
-    Garante que a pasta raiz da empresa exista em /packs/<empresa>.
-
-    Mantemos o arquivo de controle NSU nesta pasta raiz, enquanto os artefatos
-    de download passam a ser gravados dentro de subpastas por competência.
-    """
     cod_str = str(cod_empresa)
     template_dir = Path(DIRETORIOS["notas"]) / "0"
     target_dir = company_root_dir(cod_empresa, company_name)
@@ -81,7 +74,7 @@ def ensure_company_workspace(
                 target_dir.mkdir(parents=True, exist_ok=True)
                 logger.info("Pasta raiz da empresa %s criada sem modelo base.", cod_str)
 
-        _configure_company_report(target_dir, cnpj, cod_str)
+        _remove_legacy_spreadsheets(target_dir)
         return True, str(target_dir)
 
     except Exception as exc:
@@ -96,10 +89,6 @@ def ensure_period_workspace(
     year: str | int,
     month: str | int,
 ) -> tuple[bool, str]:
-    """
-    Garante a pasta da competência:
-    /packs/<Empresa>/<MM-AAAA>/{PRESTADOS,TOMADOS,EVENTOS}
-    """
     ok, message = ensure_company_workspace(cod_empresa, cnpj, company_name)
     if not ok:
         return False, message
@@ -115,97 +104,17 @@ def ensure_period_workspace(
             if folder_name in {"PRESTADOS", "TOMADOS"}:
                 (folder / "Canceladas").mkdir(parents=True, exist_ok=True)
 
-        _configure_period_report(root_dir, period_dir, cnpj, str(cod_empresa))
+        _remove_legacy_spreadsheets(period_dir)
         return True, str(period_dir)
     except Exception as exc:
-        logger.error("Erro ao preparar pasta da competência %s/%s para a empresa %s: %s", month, year, cod_empresa, exc)
-        return False, f"Erro ao preparar pasta da competência {month}-{year} da empresa {cod_empresa}: {exc}"
+        logger.error("Erro ao preparar pasta da competencia %s/%s para a empresa %s: %s", month, year, cod_empresa, exc)
+        return False, f"Erro ao preparar pasta da competencia {month}-{year} da empresa {cod_empresa}: {exc}"
 
 
-def _configure_company_report(company_dir: Path, cnpj: str, cod_empresa: str) -> None:
-    """Mantém um relatório base na pasta raiz da empresa, quando disponível."""
-    expected_report = company_dir / f"relatorio_{cod_empresa}.xlsm"
-    report_file = _ensure_report_file(company_dir, expected_report)
-    if report_file is None:
-        return
-
-    _write_target_cnpj(report_file, cnpj, cod_empresa)
-
-
-def _configure_period_report(company_dir: Path, period_dir: Path, cnpj: str, cod_empresa: str) -> None:
-    expected_report = period_dir / f"relatorio_{cod_empresa}.xlsm"
-    report_file = _ensure_report_file(period_dir, expected_report, source_dir=company_dir)
-    if report_file is None:
-        return
-
-    _write_target_cnpj(report_file, cnpj, cod_empresa)
-
-
-def _ensure_report_file(target_dir: Path, expected_report: Path, source_dir: Path | None = None) -> Path | None:
-    if expected_report.exists():
-        return expected_report
-
-    xlsm_files = sorted(target_dir.glob("*.xlsm"))
-    if xlsm_files:
-        report_file = xlsm_files[0]
-        if report_file != expected_report:
-            try:
-                report_file.rename(expected_report)
-                logger.info("Relatório renomeado para %s.", expected_report.name)
-                return expected_report
-            except OSError as exc:
-                logger.warning("Não foi possível renomear o relatório %s: %s", report_file, exc)
-                return report_file
-        return report_file
-
-    candidate_sources: list[Path] = []
-    if source_dir is not None:
-        candidate_sources.extend(sorted(source_dir.glob("*.xlsm")))
-
-    model_path = Path(DIRETORIOS["planilha_modelo"])
-    if model_path.exists():
-        candidate_sources.append(model_path)
-
-    for source in candidate_sources:
-        if not source.exists():
-            continue
+def _remove_legacy_spreadsheets(base_dir: Path) -> None:
+    for file_path in base_dir.glob("*.xlsm"):
         try:
-            shutil.copy2(source, expected_report)
-            logger.info("Relatório copiado para %s a partir de %s.", expected_report, source)
-            return expected_report
+            file_path.unlink()
+            logger.info("Planilha legada removida de %s.", file_path)
         except OSError as exc:
-            logger.warning("Não foi possível copiar o relatório base %s: %s", source, exc)
-
-    logger.warning("Nenhum arquivo .xlsm encontrado para preparar o relatório em %s.", target_dir)
-    return None
-
-
-def _write_target_cnpj(report_file: Path, cnpj: str, cod_empresa: str) -> None:
-    try:
-        from openpyxl import load_workbook
-    except ImportError:
-        logger.warning("Biblioteca openpyxl não disponível para ajustar o relatório da empresa %s.", cod_empresa)
-        return
-
-    workbook = None
-    try:
-        workbook = load_workbook(report_file, keep_vba=True)
-        if "alvo" not in workbook.sheetnames:
-            return
-
-        sheet = workbook["alvo"]
-        cnpj_str = str(cnpj)
-
-        if sheet["A1"].value != cnpj_str:
-            sheet["A1"] = cnpj_str
-            sheet["A1"].number_format = "@"
-            workbook.save(report_file)
-            logger.info("Relatório da empresa %s atualizado com o CNPJ em alvo!A1.", cod_empresa)
-    except Exception as exc:
-        logger.warning("Erro ao ajustar o relatório da empresa %s: %s", cod_empresa, exc)
-    finally:
-        if workbook is not None:
-            try:
-                workbook.close()
-            except Exception:
-                pass
+            logger.warning("Nao foi possivel remover a planilha legada %s: %s", file_path, exc)

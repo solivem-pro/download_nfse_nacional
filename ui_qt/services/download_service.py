@@ -14,6 +14,7 @@ from config.company_workspace import company_control_file, company_period_dir, e
 from config.config import DIRETORIOS, ROOT_DIR, Config
 from downloader.competencia import NFSeDownloaderCompetencia
 from downloader.emissao import NFSeDownloaderEmissao
+from downloader.report_pdf import generate_report_pdf
 
 logger = logging.getLogger(__name__)
 
@@ -292,63 +293,27 @@ def _build_downloader(config: Config, consult_mode: str) -> NFSeDownloaderEmissa
 
 def _process_after_download(cod_company: int | str, company_name: str, year: str, month: str) -> bool:
     period_dir = company_period_dir(cod_company, company_name, year, month)
-    xlsm_files = sorted(period_dir.glob("*.xlsm"))
-    if not xlsm_files:
-        logger.warning("Nenhum arquivo .xlsm encontrado para a empresa %s.", cod_company)
-        return False
-
-    report_path = xlsm_files[0]
-    macro_ok = _run_excel_macro(report_path, "ImportarTodosXMLs")
-    zip_ok = _zip_company_folder(period_dir, Path(DIRETORIOS["notas"]) / f"{cod_company}.zip")
-    return macro_ok and zip_ok
-
-
-def _run_excel_macro(report_path: Path, macro_name: str) -> bool:
-    excel = None
-    workbook = None
-
     try:
-        import pythoncom
-        import win32com.client as win32
-    except ImportError:
-        logger.warning("pywin32 nao esta disponivel para executar a macro %s.", macro_name)
-        return False
-
-    try:
-        pythoncom.CoInitialize()
-        excel = win32.DispatchEx("Excel.Application")
-        excel.Visible = 0
-        excel.DisplayAlerts = 0
-        excel.AskToUpdateLinks = 0
-        excel.ScreenUpdating = 0
-        excel.EnableEvents = 0
-        excel.Interactive = 0
-
-        time.sleep(0.5)
-        workbook = excel.Workbooks.Open(str(report_path), ReadOnly=False)
-        excel.Run(macro_name)
-        workbook.Save()
-        workbook.Close()
-        excel.Quit()
-        logger.info("Macro %s executada com sucesso em %s.", macro_name, report_path)
-        return True
-
+        company = next(
+            (item for item in list_companies() if str(item.get("cod")) == str(cod_company)),
+            {},
+        )
+        report_path = generate_report_pdf(
+            period_dir=period_dir,
+            cod_company=cod_company,
+            company_name=company_name,
+            company_cnpj=str(company.get("cnpj", "") or ""),
+            year=str(year),
+            month=str(month),
+        )
+        logger.info("Relatorio PDF gerado para a empresa %s em %s.", cod_company, report_path)
+        report_ok = True
     except Exception as exc:
-        logger.error("Erro ao executar macro %s em %s: %s", macro_name, report_path, exc)
-        try:
-            if workbook:
-                workbook.Close(SaveChanges=False)
-            if excel:
-                excel.Quit()
-        except Exception:
-            pass
-        return False
+        logger.error("Erro ao gerar relatorio PDF da empresa %s: %s", cod_company, exc)
+        report_ok = False
 
-    finally:
-        try:
-            pythoncom.CoUninitialize()
-        except Exception:
-            pass
+    zip_ok = _zip_company_folder(period_dir, Path(DIRETORIOS["notas"]) / f"{cod_company}.zip")
+    return report_ok and zip_ok
 
 
 def _zip_company_folder(source_dir: Path, zip_path: Path) -> bool:

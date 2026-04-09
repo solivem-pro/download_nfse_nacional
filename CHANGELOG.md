@@ -1,6 +1,6 @@
 ---
 created: 2025-10-21T14:50
-updated: 2026-04-08T17:58
+updated: 2026-04-09T11:08
 ---
 # Changelog
 
@@ -18,13 +18,14 @@ Contribuinte: Thiago V. M. dos Santos
 - Consulta paralela de eventos por chave da NFS-e, com salvamento dos XMLs em `EVENTOS`.
 - Identificacao de cancelamento por evento para separar documentos cancelados em subpasta dedicada.
 - Resumo do download com estatisticas separadas para PDFs, eventos e cancelamentos.
+- Geracao nativa de relatorio PDF a partir dos XMLs baixados, sem macro do Excel.
 
 ### Changed
 - Documentacao principal atualizada para refletir o launcher `download_nfse_qt.py`.
-- Build Windows atualizado para empacotar a interface Qt e instalar as dependencias automaticamente antes do `PyInstaller`.
+- Build Windows atualizado para gerar executavel `onefile`, com arquivos internos em `%AppData%` e downloads na area de trabalho do usuario.
 - Instalador ajustado para o ambiente atual, sem dependencia de `tkinter`.
 - Fluxo de cadastros migrado do JSON legado para `SQLite`, com compatibilidade de leitura e importacao inicial.
-- Preparacao automatica da estrutura fisica da empresa e do relatorio `.xlsm` no primeiro uso.
+- Preparacao automatica da estrutura fisica da empresa no primeiro uso, sem depender de planilha modelo.
 - Download de PDFs e eventos passou a usar `retry`, `backoff` e `delay` proprio para reduzir falhas por rate limit e instabilidade.
 - Classificacao de XMLs de evento passou a priorizar `infEvento/pedRegEvento`, evitando misturar evento com NFSe normal.
 - Estrutura de `packs` reorganizada para `Empresa/Competencia (MM-AAAA)/PRESTADOS|TOMADOS|EVENTOS`.
@@ -32,10 +33,12 @@ Contribuinte: Thiago V. M. dos Santos
 - NFS-e com retencao passam a receber o sufixo `- Retido`.
 - Arquivo de controle `nsu_competencia.json` passa a ficar na pasta raiz da empresa.
 - Pos-processamento e compactacao passam a considerar a competencia atual, sem misturar periodos diferentes no mesmo pacote.
+- Dependencias e documentacao passam a refletir o fluxo nativo em PDF, sem `pywin32` no caminho principal.
 
 ### Removed
 - Launcher antigo em Tk e scripts da antiga pasta `ui/`.
 - Dependencias e referencias legadas de `tkhtmlview`, `markdown` e `plyer`.
+- Dependencia ativa de planilhas `.xlsm` e macro do Excel no fluxo principal de download.
 
 ## [1.0] - 2025-12-18
 Contribuinte: Solivan A. dos Santos

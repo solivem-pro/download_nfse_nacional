@@ -1,6 +1,6 @@
 requests
 cryptography
 openpyxl
-pywin32
 PySide6>=6.7
 python-dateutil
+reportlab

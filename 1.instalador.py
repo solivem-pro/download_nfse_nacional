@@ -39,10 +39,7 @@ _CONFIG_FILES = {
     "config_json": ROOT_DIR / "_internal" / "config" / "config.json",
 }
 
-ATT_SHEET_PY = ROOT_DIR / "config" / "att_planilhas.py"
-
 IMPORT_NAME_OVERRIDES = {
-    "pywin32": "win32api",
     "python-dateutil": "dateutil",
 }
 
@@ -158,16 +155,6 @@ def verificar_instalar_dependencias():
     return len(falhas) == 0, falhas
 
 
-def atualizar_planilhas() -> None:
-    """Executa o script de atualizacao de planilhas."""
-    print("\nAtualizando planilhas Excel...")
-    try:
-        subprocess.check_call([sys.executable, str(ATT_SHEET_PY)])
-        print("[OK] Planilhas atualizadas com sucesso")
-    except subprocess.CalledProcessError as exc:
-        print(f"[ERRO] Falha ao atualizar planilhas: {exc}")
-
-
 def formatar_lista_falhas(falhas):
     """Formata a lista de falhas com bullets simples."""
     if not falhas:
@@ -200,7 +187,6 @@ def main():
             "Agora voce pode executar o programa principal."
         )
         print(f"\n{mensagem}")
-        atualizar_planilhas()
         mostrar_popup(mensagem, "Instalacao Completa")
         return
 
