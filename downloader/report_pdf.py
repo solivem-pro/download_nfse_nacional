@@ -509,7 +509,7 @@ def _build_section_table(rows: list[NFSeReportItem], styles) -> Table:
                 item.numero,
                 item.emissao,
                 _display_access_key(item.chave),
-                item.counterparty,
+                item.counterparty[:60],
                 _format_money(item.valor_servico),
                 _make_status(item.situacao, styles),
             ]
