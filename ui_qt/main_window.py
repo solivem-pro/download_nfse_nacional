@@ -28,6 +28,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.setWindowTitle(f"Download NFSe Nacional v{app_version()}")
         self.setMinimumSize(1180, 780)
         self.setWindowIcon(_load_icon())
+        self.showMaximized()
 
         central = QtWidgets.QWidget()
         central.setObjectName("AppRoot")

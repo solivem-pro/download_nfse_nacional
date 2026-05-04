@@ -504,12 +504,15 @@ def _build_section_metrics(
 def _build_section_table(rows: list[NFSeReportItem], styles) -> Table:
     data = [["NFSe", "Emissao", "Chave de acesso", "Tomador/Prestador", "Valor", "Situacao"]]
     for item in rows:
+
+        nome = item.counterparty
+        item_display = nome[:27] + "..." if len(nome) > 30 else nome
         data.append(
             [
                 item.numero,
                 item.emissao,
                 _display_access_key(item.chave),
-                item.counterparty[:60],
+                item_display,
                 _format_money(item.valor_servico),
                 _make_status(item.situacao, styles),
             ]
