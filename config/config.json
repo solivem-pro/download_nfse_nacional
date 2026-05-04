@@ -1,0 +1,8 @@
+{
+  "file_prefix": "NSU",
+  "download_pdf": false,
+  "delay_seconds": 0.5,
+  "timeout": 60,
+  "consult_mode": "Competencia",
+  "save_mode": "Codigo"
+}
