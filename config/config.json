@@ -1,8 +1,8 @@
 {
-  "file_prefix": "NFSE",
-  "download_pdf": true,
-  "delay_seconds": 3.0,
-  "timeout": 30.0,
-  "consult_mode": "Emissão",
-  "save_mode": "CNPJ"
+  "file_prefix": "NSU",
+  "download_pdf": false,
+  "delay_seconds": 0.5,
+  "timeout": 60,
+  "consult_mode": "Competencia",
+  "save_mode": "Codigo"
 }

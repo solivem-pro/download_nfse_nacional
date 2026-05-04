@@ -210,16 +210,16 @@ def atualizar_todas():
         
         print(f"\n2. REPLICANDO PARA OUTRAS PASTAS")
         
-        # Listar apenas pastas imediatas dentro de /packs
-        # Ignorar subpastas dentro de cada pasta (como /1515/TOMADOS, /1515/PRESTADOS, etc.)
+        # Listar pastas que possuem .xlsm em qualquer nivel abaixo de /packs.
         pastas_encontradas = []
-        
-        for item in os.listdir(DIRETORIOS["packs"]):
-            caminho = os.path.join(DIRETORIOS["packs"], item)
-            if os.path.isdir(caminho):
-                pastas_encontradas.append(caminho)
-        
-        print(f"  Total de pastas encontradas no nivel raiz: {len(pastas_encontradas)}")
+        for raiz, _, arquivos in os.walk(DIRETORIOS["packs"]):
+            if os.path.abspath(raiz) == os.path.abspath(BASE_DIR):
+                pastas_encontradas.append(raiz)
+                continue
+            if any(arquivo.lower().endswith(".xlsm") for arquivo in arquivos):
+                pastas_encontradas.append(raiz)
+
+        print(f"  Total de pastas com .xlsm encontradas: {len(pastas_encontradas)}")
         
         # Atualizar cada pasta (exceto a base que ja foi processada)
         for i, caminho in enumerate(pastas_encontradas, 1):

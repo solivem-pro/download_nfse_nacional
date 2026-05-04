@@ -6,3 +6,4 @@ config/cadastros.json
 build/
 dist/
 download_nfse.spec
+__pycache__/*
